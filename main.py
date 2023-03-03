@@ -1,4 +1,8 @@
 import time
+import os
+
+from threading import Thread
+from multiprocessing import Pool
 
 from openpyxl import load_workbook
 from selenium import webdriver
@@ -17,7 +21,10 @@ def wait_click(d, path):
         WebDriverWait(d, 60).until(
             EC.presence_of_element_located((By.XPATH, path))
         ).click()
-    except Sere or E_click:  # обрабатываем исключение ожиданием и рекурсией
+    except Sere:  # обрабатываем исключение ожиданием и рекурсией
+        time.sleep(5)
+        wait_click(d, path)
+    except E_click:
         time.sleep(5)
         wait_click(d, path)
 
@@ -40,7 +47,6 @@ def browse(org):
     # Добавление пути к профилю Хром
     options.add_argument(r"user-data-dir=C:\Users\РДС\AppData\Local\Google\Chrome\User Data")
 
-    # TODO: Если организация МС выбираем профиль 1 иначе если АТМ выбираем профиль 2
     match org:
         case 'МС':
             # Указание папки профиля
@@ -211,28 +217,32 @@ def public_info(d, num_res):
 # Функция авторизации в ГУ
 def authorization_gu(d, org):
     d.get("https://esia.gosuslugi.ru/login/")
+
+    wait_click(d, '/html/body/esia-root/div/esia-login/div/div[1]/form/div[4]/div/div[2]/div/button')
+    wait_click(d, '/html/body/esia-root/div/esia-login/div/div[1]/esia-eds/button')
     match org:
         case 'МС':
-            wait_click(d, '/html/body/esia-root/div/esia-login/div/div[1]/form/div[4]/div/div[2]/div/button')
-            wait_click(d, '/html/body/esia-root/div/esia-login/div/div[1]/esia-eds/button')
-            wait_click(d, '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/esia-eds-item[1]')
-            wait_click(d, '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/div[2]/a')
+            wait_click(d,
+                       '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/esia-eds-item[1]')
         case 'АТМ':
-            # TODO: дописать кейс для организации АТМ
-            pass
+            wait_click(d,
+                       '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/esia-eds-item[2]')
+
+    wait_click(d, '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/div[2]/a')
+    time.sleep(10)
 
 
 # Функция авторизации в РА
 def authorization_ra(d, org):
     # Переход на ФСА после входа в EСИА
-    d.get("http://10.250.74.17/auth/?redirect_uri=http://10.250.74.17/logout")
+    d.get("http://10.250.74.17/auth/?redirect_uri=http://10.250.74.17/roei/verification-measuring-instruments")
 
     # ожидание
     # Нажатие на кнопку "Вход в ЕСИА"
     wait_click(d, "/html/body/div/div[2]/div/div[2]/a[1]")
 
     # Переключение рабочей вкладки
-    windows = driver.window_handles  # Список всех вкладок
+    windows = d.window_handles  # Список всех вкладок
 
     time.sleep(5)  # ожидание
 
@@ -254,9 +264,16 @@ def authorization_ra(d, org):
             wait_click(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div["
                           "1]/fgis-virtual-list-item")
 
-        case 'ATM':
-            # TODO: дописать кейс для организации АТМ
-            pass
+        case 'АТМ':
+            # Выбор организации "АТМ"
+            wait_click(d, '/html/body/div/div[2]/div/div/table/tbody/tr[2]/td/a')
+
+            # Открытие списка выбора рабочей области
+            wait_click(d, "/html/body/fgis-root/div/fgis-lk/div/fgis-lk-selector/div[5]/div/div["
+                          "2]/fgis-selectbox/div/div/div[2]")
+
+            # Выбор рабочей области в нашем случае АЛ
+            wait_click(d, '/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div[1]/fgis-virtual-list-item/li/div')
 
     # Нажатие на кнопку входа в личный кабинет
     wait_click(d, "/html/body/fgis-root/div/fgis-lk/div/fgis-lk-selector/div[5]/div/div[2]/button")
@@ -281,14 +298,8 @@ def all_authorization(d, org):
         authorization_ra(d, org)
 
 
-if __name__ == '__main__':
-
-    # TODO: прикрутить проход по папке
-    file_name = 'МС 28.02.2023 - 28.02.2023.xlsx'
-
-    organization = file_name.split()[0]
-
-    # получение драйвера
+def one_rm(file_name, organization):
+    # Создание объекта класса Chrome
     driver = browse(organization)
 
     # Проверка на необходимость авторизации
@@ -328,3 +339,10 @@ if __name__ == '__main__':
     wb.close()
 
     driver.close()
+
+
+if __name__ == '__main__':
+    books = os.listdir(f'{os.getcwd()}/file')
+
+    for book in books:
+        one_rm(f'file/{book}', book.split()[0])
