@@ -1,15 +1,11 @@
 import time
 import os
 
-from threading import Thread
-from multiprocessing import Pool
-
 from openpyxl import load_workbook
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException as Nse
 from selenium.common.exceptions import StaleElementReferenceException as Sere
 from selenium.common.exceptions import ElementClickInterceptedException as E_click
 from selenium.common.exceptions import TimeoutException as Te
@@ -27,6 +23,9 @@ def wait_click(d, path):
     except E_click:
         time.sleep(5)
         wait_click(d, path)
+    except Te:
+        time.sleep(5)
+        wait_click(d, path)
 
 
 # ожидание для внедрения значения
@@ -38,6 +37,41 @@ def wait_send_keys(d, path, paste):
     except Sere:  # обрабатываем исключение ожиданием и рекурсией
         time.sleep(5)
         wait_send_keys(d, path, paste)
+    except E_click:
+        time.sleep(5)
+        wait_send_keys(d, path, paste)
+    except Te:  # обрабатываем исключение ожиданием и рекурсией
+        time.sleep(5)
+        wait_send_keys(d, path, paste)
+
+
+# ожидание появления номера счетчика в поиске
+def special_wait(d, path, paste):
+    try:
+        WebDriverWait(d, 80).until(
+            EC.text_to_be_present_in_element((By.XPATH, path), str(paste)))
+    except Te:
+        d.refresh()
+
+        check_info(d, paste)
+
+        special_wait(d, path, paste)
+
+
+# поиск по номеру
+def check_info(d, paste):
+    # Вставка в поле номера рез.пов в соответствующее поле отбора
+    wait_send_keys(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
+                      '/fgis-roei-verification-measuring-instruments-advanced-search/fgis-filters-panel/fgis'
+                      '-left-panel/div[2]/div[2]/div/div['
+                      '1]/fgis-field-input/fgis-field-wrapper/div/div/input', paste)
+
+    time.sleep(10)
+
+    # Нажатие на кнопку найти
+    wait_click(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
+                  '/fgis-roei-verification-measuring-instruments-advanced-search/fgis-filters-panel/fgis'
+                  '-left-panel/div[3]/div/button')
 
 
 # Функция создания объекта браузера с необходимыми параметрами
@@ -67,7 +101,7 @@ def browse(org):
 
 
 # Функция внесения сведений о поверках
-def update_info(d, r):
+def update_info(d, r, org):
     # Переход в рабочую область
     d.get("http://10.250.74.17/roei/verification-measuring-instruments")
 
@@ -127,13 +161,6 @@ def update_info(d, r):
         wait_click(d, '/html/body/fgis-root/div/fgis-roei/fgis-verification-measuring-instruments-card-edit/div/div/div'
                       '/div/fgis-verification-measuring-instruments-card-edit-common/fgis-card-block/div/div[1]/div[1]')
 
-        # # Закрытие формы "Дата действия результатов поверки"
-        # wait_click(d, "/html/body/fgis-root/div/fgis-roei/fgis-verification-measuring-instruments"
-        #               "-card-edit/div/div/div/div/fgis-verification-measuring-instruments-card-edit"
-        #               "-common/fgis-card-block/div/div[2]/div/fgis-card-edit-row-two-columns["
-        #               "2]/fgis-card-edit-row[2]/div["
-        #               "2]/fgis-field-calendar/fgis-field-wrapper/div/div/fgis-calendar/div/div")
-
     else:
         # Выбор элемент "Непригодно"
         wait_click(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div["
@@ -146,33 +173,50 @@ def update_info(d, r):
                   "/fgis-card-block/div/div[2]/div/fgis-card-edit-row[2]/div["
                   "2]/fgis-field-selectbox/fgis-field-wrapper/div/div/fgis-selectbox/div/div/div[1]")
 
+    time.sleep(10)
+
     # Внесение в поле фамилии поверителя
     wait_send_keys(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[1]/input", r[5].value)
 
+    time.sleep(5)
+
     # Выбор фамилии из списка
     if r[5].value == 'Гипич':  # для Гипич отдельное условие так как есть совпадение фамилий
-        try:
-            wait_click(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div["
-                          "2]/fgis-virtual-list-item")
-        except Nse:
-            print('ошибка: NSE')
-            d.refresh()
-            return 'refresh'
+        wait_click(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div["
+                      "2]/fgis-virtual-list-item")
     else:
-        try:
-            wait_click(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div["
-                          "2]/div/fgis-virtual-list-item")
-        except Nse:
-            print('ошибка: NSE')
-            d.refresh()
-            return 'refresh'
+        wait_click(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div["
+                      "2]/div/fgis-virtual-list-item")
 
     # нажатие на подтверждение заполненности формы
     wait_click(d, "/html/body/fgis-root/div/fgis-roei/fgis-verification-measuring-instruments-card-edit"
                   "/fgis-verification-measuring-instruments-card-edit-toolbar/div/fgis-toolbar/div/div["
                   "1]/fgis-toolbar-button")
 
+    time.sleep(10)
+
+    match org:
+        case 'МС':
+            paste = 'Общество с ограниченной ответственностью "МС"'
+            wait_att(d, paste)
+        case 'АТМ':
+            paste = 'Общество с ограниченной ответственностью "АТМ"'
+            wait_att(d, paste)
+
     return 'Черновик РА'
+
+
+# Ожидание появления необходимого аттрибута
+def wait_att(d, paste):
+    try:
+        WebDriverWait(d, 60).until(
+            EC.text_to_be_present_in_element_attribute((By.XPATH, '/html/body/fgis-root/div/fgis-roei'
+                                                                  '/fgis-roei-verification-measuring-instruments'
+                                                                  '/div/div/div[2]/fgis-table/div[2]/div/table/tbody'
+                                                                  '/a[1]/td[10]/div/div[1]/span'), 'title', str(paste)))
+    except Te:
+        d.refresh()
+        wait_att(d, paste)
 
 
 # Функция публикации сведения в РА
@@ -180,23 +224,13 @@ def public_info(d, num_res):
     # Переход в рабочую область
     d.get("http://10.250.74.17/roei/verification-measuring-instruments")
 
-    # Вставка в поле номера рез.пов в соответствующее поле отбора
-    wait_send_keys(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
-                      '/fgis-roei-verification-measuring-instruments-advanced-search/fgis-filters-panel/fgis'
-                      '-left-panel/div[2]/div[2]/div/div['
-                      '1]/fgis-field-input/fgis-field-wrapper/div/div/input', num_res)
-
-    # Нажатие на кнопку найти
-    wait_click(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
-                  '/fgis-roei-verification-measuring-instruments-advanced-search/fgis-filters-panel/fgis'
-                  '-left-panel/div[3]/div/button')
+    check_info(d, num_res)
 
     # Ожидание появления строки с необходимым номером
-    WebDriverWait(d, 60).until(
-        EC.text_to_be_present_in_element((By.XPATH, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification'
-                                                    '-measuring-instruments/div/div '
-                                                    '/div[2]/fgis-table/div[2]/div/table/tbody/a[1]/td['
-                                                    '5]/div/div[1]/span'), str(num_res)))
+    special_wait(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification'
+                    '-measuring-instruments/div/div '
+                    '/div[2]/fgis-table/div[2]/div/table/tbody/a[1]/td['
+                    '5]/div/div[1]/span', num_res)
 
     # Выбор первого элемента записи
     wait_click(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div/div'
@@ -273,7 +307,8 @@ def authorization_ra(d, org):
                           "2]/fgis-selectbox/div/div/div[2]")
 
             # Выбор рабочей области в нашем случае АЛ
-            wait_click(d, '/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div[1]/fgis-virtual-list-item/li/div')
+            wait_click(d,
+                       '/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div[1]/fgis-virtual-list-item/li/div')
 
     # Нажатие на кнопку входа в личный кабинет
     wait_click(d, "/html/body/fgis-root/div/fgis-lk/div/fgis-lk-selector/div[5]/div/div[2]/button")
@@ -298,6 +333,7 @@ def all_authorization(d, org):
         authorization_ra(d, org)
 
 
+# Функция обработки файла
 def one_rm(file_name, organization):
     # Создание объекта класса Chrome
     driver = browse(organization)
@@ -315,17 +351,10 @@ def one_rm(file_name, organization):
 
             # проверка поля статуса Если статус Выгружена в АРШИН тогда переходим к созданию черновика
             if row[6].value == 'Выгружена в АРШИН':
-                call = update_info(driver, row)  # Заполняем и сохраняем черновик
-
-                # отработка исключения
-                while call == 'refresh':
-                    time.sleep(10)  # ожидание
-                    driver = browse(organization)  # обновляем объект браузера
-                    all_authorization(driver, organization)  # повторно проходим круг с авторизацией
-                    call = update_info(driver, row)  # Заполняем и сохраняем черновик
+                call = update_info(driver, row, organization)  # Заполняем и сохраняем черновик
 
                 row[6].value = call
-                time.sleep(5)  # ожидание
+                time.sleep(10)  # ожидание
                 wb.save(file_name)  # сохраняем статус
 
             # Если статус = Черновик РА тогда приступаем к публикации сведения
@@ -341,8 +370,10 @@ def one_rm(file_name, organization):
     driver.close()
 
 
+# Проход по файлам папки
 if __name__ == '__main__':
     books = os.listdir(f'{os.getcwd()}/file')
 
     for book in books:
+        print(book)
         one_rm(f'file/{book}', book.split()[0])
