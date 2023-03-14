@@ -2,7 +2,10 @@ import time
 import os
 
 from openpyxl import load_workbook
+from threading import Thread
+
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,13 +21,13 @@ def wait_click(d, path):
             EC.presence_of_element_located((By.XPATH, path))
         ).click()
     except Sere:  # обрабатываем исключение ожиданием и рекурсией
-        time.sleep(5)
+        time.sleep(3)
         wait_click(d, path)
     except E_click:
-        time.sleep(5)
+        time.sleep(3)
         wait_click(d, path)
     except Te:
-        time.sleep(5)
+        time.sleep(3)
         wait_click(d, path)
 
 
@@ -35,13 +38,13 @@ def wait_send_keys(d, path, paste):
             EC.presence_of_element_located((By.XPATH, path))
         ).send_keys(paste)
     except Sere:  # обрабатываем исключение ожиданием и рекурсией
-        time.sleep(5)
+        time.sleep(3)
         wait_send_keys(d, path, paste)
     except E_click:
-        time.sleep(5)
+        time.sleep(3)
         wait_send_keys(d, path, paste)
     except Te:  # обрабатываем исключение ожиданием и рекурсией
-        time.sleep(5)
+        time.sleep(3)
         wait_send_keys(d, path, paste)
 
 
@@ -66,7 +69,7 @@ def check_info(d, paste):
                       '-left-panel/div[2]/div[2]/div/div['
                       '1]/fgis-field-input/fgis-field-wrapper/div/div/input', paste)
 
-    time.sleep(10)
+    time.sleep(5)
 
     # Нажатие на кнопку найти
     wait_click(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
@@ -78,26 +81,40 @@ def check_info(d, paste):
 def browse(org):
     options = webdriver.ChromeOptions()
 
-    # Добавление пути к профилю Хром
-    options.add_argument(r"user-data-dir=C:\Users\РДС\AppData\Local\Google\Chrome\User Data")
-
-    match org:
-        case 'МС':
-            # Указание папки профиля
-            options.add_argument("profile-directory=Profile 1")
-        case 'АТМ':
-            # Указание папки профиля
-            options.add_argument("profile-directory=Profile 2")
-
-    # Путь и подключение плагина Госуслуг TODO: прописать универсальный путь
-    path_to_extension = r'C:\Users\РДС\Pictures\crx\gu.crx'
+    # Путь и подключение плагина Госуслуг
+    path_to_extension = 'crx/gu.crx'
     options.add_extension(path_to_extension)
 
     # Отключение метки об автоматическом контроле
     options.add_argument("--disable-blink-features=AutomationControlled")
 
-    # Создание объекта класса Chrome
-    return webdriver.Chrome(options=options)
+    match org:
+        case 'МС':
+            # Добавление пути к профилю Хром
+            options.add_argument(fr"user-data-dir=C:\Users\{str(os.getlogin())}\AppData\Local\Google\Chrome\User Data")
+
+            # Указание папки профиля
+            options.add_argument("profile-directory=Profile 1")
+
+            # Путь к драйверу
+            path = Service('chromedriver_1.exe')
+
+            # Создание объекта класса Chrome
+            return webdriver.Chrome(service=path, options=options)
+
+        case 'АТМ':
+            # Добавление пути к профилю Хром
+            options.add_argument(
+                fr"user-data-dir=C:\Users\{str(os.getlogin())}\AppData\Local\Google\Chrome\User Data Copy")
+
+            # Указание папки профиля
+            options.add_argument("profile-directory=Profile 2")
+
+            # Путь к драйверу
+            path = Service('chromedriver.exe')
+
+            # Создание объекта класса Chrome
+            return webdriver.Chrome(service=path, options=options)
 
 
 # Функция внесения сведений о поверках
@@ -173,12 +190,12 @@ def update_info(d, r, org):
                   "/fgis-card-block/div/div[2]/div/fgis-card-edit-row[2]/div["
                   "2]/fgis-field-selectbox/fgis-field-wrapper/div/div/fgis-selectbox/div/div/div[1]")
 
-    time.sleep(10)
+    time.sleep(5)
 
     # Внесение в поле фамилии поверителя
     wait_send_keys(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[1]/input", r[5].value)
 
-    time.sleep(5)
+    time.sleep(3)
 
     # Выбор фамилии из списка
     if r[5].value == 'Гипич':  # для Гипич отдельное условие так как есть совпадение фамилий
@@ -192,8 +209,6 @@ def update_info(d, r, org):
     wait_click(d, "/html/body/fgis-root/div/fgis-roei/fgis-verification-measuring-instruments-card-edit"
                   "/fgis-verification-measuring-instruments-card-edit-toolbar/div/fgis-toolbar/div/div["
                   "1]/fgis-toolbar-button")
-
-    time.sleep(10)
 
     match org:
         case 'МС':
@@ -329,6 +344,10 @@ def all_authorization(d, org):
     except Te:
         # прохождение авторизации В ГУ
         authorization_gu(d, org)
+
+        # ожидание
+        time.sleep(5)
+
         # прохождение авторизации в RA
         authorization_ra(d, org)
 
@@ -351,16 +370,13 @@ def one_rm(file_name, organization):
 
             # проверка поля статуса Если статус Выгружена в АРШИН тогда переходим к созданию черновика
             if row[6].value == 'Выгружена в АРШИН':
-                call = update_info(driver, row, organization)  # Заполняем и сохраняем черновик
-
-                row[6].value = call
-                time.sleep(10)  # ожидание
+                row[6].value = update_info(driver, row, organization)  # Заполняем и сохраняем черновик
                 wb.save(file_name)  # сохраняем статус
 
             # Если статус = Черновик РА тогда приступаем к публикации сведения
             if row[6].value == 'Черновик РА':
-                row[6].value = public_info(driver, row[0].value)  # публикуем запись
-                time.sleep(5)  # ожидание
+                row[6].value = public_info(driver, row[0].value)  # публикуем запись\
+                time.sleep(3)
                 wb.save(file_name)  # сохраняем статус
         else:
             break
@@ -370,10 +386,69 @@ def one_rm(file_name, organization):
     driver.close()
 
 
-# Проход по файлам папки
+# Функция создания потока
+def add_tread(excel):
+    # Запуск процесса
+    tr = Thread(name='Browser for {}'.format(excel), target=one_rm, args=(f'file/{excel}', excel.split()[0],))
+    tr.start()
+
+    print(tr.name + ' started!')
+    return tr
+
+
+# Функция закрытия потоков
+def close_tread(tr_list):
+
+    # Ожидание завершения процессов
+    for tr in tr_list:
+        tr.join()
+
+
+# Добавлена "теоретическая" возможность работы нескольких драйверов
 if __name__ == '__main__':
+
+    # Получение списка файлов в папке
     books = os.listdir(f'{os.getcwd()}/file')
 
-    for book in books:
-        print(book)
-        one_rm(f'file/{book}', book.split()[0])
+    # Создание списков по организациям
+    atm_list = list(filter(lambda x: x.split()[0] == 'АТМ', books))
+    ms_list = list(filter(lambda x: x.split()[0] == 'МС', books))
+
+    # Формирование списка кортежей
+    sp_tuple = list(zip(atm_list, ms_list))
+
+    thread_list = []
+
+    # Цикл прохода по списку кортежей
+    for b in sp_tuple:
+        book_atm, book_mc = b
+
+        # Запуск процесса АТМ
+        thread_list.append(add_tread(book_atm))
+
+        # Ожидание перед запуском второго браузера
+        time.sleep(10)
+
+        # Запуск процесса МС
+        thread_list.append(add_tread(book_mc))
+
+        # Ожидание завершения процессов
+        close_tread(thread_list)
+
+    # Поиск оставшихся файлов в папке
+    # Проверяем отличие списка кортежей от суммы списком одной и второй организации
+    if len(sp_tuple) * 2 != len(atm_list) + len(ms_list):
+
+        # Создаем список из кортежей
+        list_book = [b for t_books in sp_tuple for b in t_books]
+
+        # Создаем список
+        itg = filter(lambda x: x not in list_book, books)
+
+        # Перебираем список остатков
+        for book in itg:
+            # Запускаем поток
+            thread_list.append(add_tread(book))
+
+            # Ожидание завершения процессов
+            close_tread(thread_list)
