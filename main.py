@@ -410,9 +410,7 @@ def one_rm(file_name, organization):
 # Добавление итогов по загрузке в файл
 def print_end_publ(p, file):
     with open('end/log.txt', 'a', encoding='utf-8') as write_file:
-        write_file.write(f'{len(file) * "*"}{14 * "*"}{len(str(p)) * "*"}')
-        write_file.write(f'* {file}: {p} поверок *')
-        write_file.write(f'{len(file) * "*"}{14 * "*"}{len(str(p)) * "*"}')
+        write_file.write(f'{file.split("/")[1].replace(".xlsx", "")}: {p}\n')
 
 
 # Функция создания потока
@@ -441,7 +439,7 @@ def check_path():
         os.mkdir('file')
 
 
-# Добавлена "теоретическая" возможность работы нескольких драйверов
+# Основная функция
 if __name__ == '__main__':
 
     # Получение списка файлов в папке
