@@ -1,5 +1,6 @@
 import time
 import os
+import shutil
 
 from openpyxl import load_workbook
 from threading import Thread
@@ -122,7 +123,8 @@ def update_info(d, r, org):
     # Переход в рабочую область
     d.get("http://10.250.74.17/roei/verification-measuring-instruments")
 
-    # ожидание
+    time.sleep(2)  # ожидание
+
     # Нажатие на кнопку "Добавить"
     wait_click(d, "/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div/div/div["
                   "1]/fgis-table-toolbar/section/div/div[1]/div/fgis-toolbar/div/div[1]/fgis-toolbar-button")
@@ -354,6 +356,9 @@ def all_authorization(d, org):
 
 # Функция обработки файла
 def one_rm(file_name, organization):
+
+    publ_ra = 0
+
     # Создание объекта класса Chrome
     driver = browse(organization)
 
@@ -366,7 +371,9 @@ def one_rm(file_name, organization):
 
     # Проходим по строкам
     for row in sheet.iter_rows(min_row=2):
-        if row[1].value:  # проверка на обязательное наличие сведений
+
+        # проверка на обязательное наличие сведений
+        if row[1].value:
 
             # проверка поля статуса Если статус Выгружена в АРШИН тогда переходим к созданию черновика
             if row[6].value == 'Выгружена в АРШИН':
@@ -378,12 +385,34 @@ def one_rm(file_name, organization):
                 row[6].value = public_info(driver, row[0].value)  # публикуем запись\
                 time.sleep(3)
                 wb.save(file_name)  # сохраняем статус
+
+            if row[6].value == 'Опубликовано в РА':
+                publ_ra += 1
         else:
             break
 
+    # Закрытие рабочей книга
     wb.close()
 
+    # Перемещение законченного файла
+    shutil.move(file_name, f'end/{file_name.split("/")[1]}')
+
+    # Ожидание
+    time.sleep(5)
+
+    # Закрытие браузера
     driver.close()
+
+    # создание файла итогов
+    print_end_publ(publ_ra, file_name)
+
+
+# Добавление итогов по загрузке в файл
+def print_end_publ(p, file):
+    with open('end/log.txt', 'a', encoding='utf-8') as write_file:
+        write_file.write(f'{len(file) * "*"}{14 * "*"}{len(str(p)) * "*"}')
+        write_file.write(f'* {file}: {p} поверок *')
+        write_file.write(f'{len(file) * "*"}{14 * "*"}{len(str(p)) * "*"}')
 
 
 # Функция создания потока
@@ -402,6 +431,14 @@ def close_tread(tr_list):
     # Ожидание завершения процессов
     for tr in tr_list:
         tr.join()
+
+
+# Функция проверки папок и необходимых файлов
+def check_path():
+    if not os.path.exists('end'):
+        os.mkdir('end')
+    if not os.path.exists('file'):
+        os.mkdir('file')
 
 
 # Добавлена "теоретическая" возможность работы нескольких драйверов
