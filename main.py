@@ -120,6 +120,7 @@ def browse(org):
 
 # Функция внесения сведений о поверках
 def update_info(d, r, org):
+
     # Переход в рабочую область
     d.get("http://10.250.74.17/roei/verification-measuring-instruments")
 
@@ -238,6 +239,7 @@ def wait_att(d, paste):
 
 # Функция публикации сведения в РА
 def public_info(d, num_res):
+
     # Переход в рабочую область
     d.get("http://10.250.74.17/roei/verification-measuring-instruments")
 
@@ -327,8 +329,14 @@ def authorization_ra(d, org):
             wait_click(d,
                        '/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div[1]/fgis-virtual-list-item/li/div')
 
+    # Ожидание
+    time.sleep(5)
+
     # Нажатие на кнопку входа в личный кабинет
     wait_click(d, "/html/body/fgis-root/div/fgis-lk/div/fgis-lk-selector/div[5]/div/div[2]/button")
+
+    # Ожидание
+    time.sleep(5)
 
 
 # Функция для определения продолжить работу или начать авторизацию
@@ -441,6 +449,9 @@ def check_path():
 
 # Основная функция
 if __name__ == '__main__':
+
+    # проверка пути
+    check_path()
 
     # Получение списка файлов в папке
     books = os.listdir(f'{os.getcwd()}/file')
