@@ -390,6 +390,7 @@ def one_rm(file_name, organization):
 
             # Если статус = Черновик РА тогда приступаем к публикации сведения
             if row[6].value == 'Черновик РА':
+                time.sleep(3)
                 row[6].value = public_info(driver, row[0].value)  # публикуем запись\
                 time.sleep(3)
                 wb.save(file_name)  # сохраняем статус
@@ -418,7 +419,8 @@ def one_rm(file_name, organization):
 # Добавление итогов по загрузке в файл
 def print_end_publ(p, file):
     with open('end/log.txt', 'a', encoding='utf-8') as write_file:
-        write_file.write(f'{file.split("/")[1].replace(".xlsx", "")}: {p}\n')
+        name = file.split("/")[1].replace(".xlsx", "").split('.')
+        write_file.write(f'{name[0]}.{name[1]} - {p}\n')
 
 
 # Функция создания потока
