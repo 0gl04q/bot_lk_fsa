@@ -118,11 +118,23 @@ def browse(org):
             return webdriver.Chrome(service=path, options=options)
 
 
+# Переход в рабочую область
+def work_source(d):
+    d.get("http://10.250.74.17/lk")
+
+    wait_click(d, '/html/body/fgis-root/div/fgis-lk/div/fgis-lk-overview/div/div[2]/div/div['
+                  '1]/fgis-lk-internal-menu/section/div[3]')
+
+    wait_click(d, '/html/body/fgis-root/div/fgis-activities/div[1]/div/article/div')
+
+    wait_click(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-attestation/fgis-roei-reestr-selector/div/div[4]')
+
+
 # Функция внесения сведений о поверках
 def update_info(d, r, org):
 
     # Переход в рабочую область
-    d.get("http://10.250.74.17/roei/verification-measuring-instruments")
+    work_source(d)
 
     time.sleep(2)  # ожидание
 
@@ -213,13 +225,17 @@ def update_info(d, r, org):
                   "/fgis-verification-measuring-instruments-card-edit-toolbar/div/fgis-toolbar/div/div["
                   "1]/fgis-toolbar-button")
 
+
+
     match org:
         case 'МС':
             paste = 'Общество с ограниченной ответственностью "МС"'
-            wait_att(d, paste)
         case 'АТМ':
             paste = 'Общество с ограниченной ответственностью "АТМ"'
-            wait_att(d, paste)
+        case _:
+            raise IOError("Неверно указано имя файла")
+
+    wait_att(d, paste)
 
     return 'Черновик РА'
 
@@ -241,7 +257,7 @@ def wait_att(d, paste):
 def public_info(d, num_res):
 
     # Переход в рабочую область
-    d.get("http://10.250.74.17/roei/verification-measuring-instruments")
+    work_source(d)
 
     check_info(d, num_res)
 
@@ -288,7 +304,7 @@ def authorization_gu(d, org):
 # Функция авторизации в РА
 def authorization_ra(d, org):
     # Переход на ФСА после входа в EСИА
-    d.get("http://10.250.74.17/auth/?redirect_uri=http://10.250.74.17/roei/verification-measuring-instruments")
+    work_source(d)
 
     # ожидание
     # Нажатие на кнопку "Вход в ЕСИА"
@@ -342,7 +358,7 @@ def authorization_ra(d, org):
 # Функция для определения продолжить работу или начать авторизацию
 def all_authorization(d, org):
     # переход в рабочую область
-    d.get('http://10.250.74.17/roei/verification-measuring-instruments')
+    work_source(d)
 
     # Ожидание появления строки с необходимым номером
     try:
