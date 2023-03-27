@@ -142,7 +142,7 @@ def update_info(d, r, org):
     wait_click(d, "/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div/div/div["
                   "1]/fgis-table-toolbar/section/div/div[1]/div/fgis-toolbar/div/div[1]/fgis-toolbar-button")
 
-    # Внесение "Номер рез. поверки СИ"
+    # Внесение "Номер рез. Поверки СИ"
     wait_send_keys(d, "/html/body/fgis-root/div/fgis-roei/fgis-verification-measuring-instruments-card"
                       "-edit/div/div/div/div/fgis-verification-measuring-instruments-card-edit-common"
                       "/fgis-card-block/div/div[2]/div/fgis-card-edit-row-two-columns["
@@ -225,8 +225,6 @@ def update_info(d, r, org):
                   "/fgis-verification-measuring-instruments-card-edit-toolbar/div/fgis-toolbar/div/div["
                   "1]/fgis-toolbar-button")
 
-
-
     match org:
         case 'МС':
             paste = 'Общество с ограниченной ответственностью "МС"'
@@ -292,10 +290,12 @@ def authorization_gu(d, org):
     match org:
         case 'МС':
             wait_click(d,
-                       '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/esia-eds-item[1]')
+                       '/html/body/esia-root/esia-modal-placeholder/div/div['
+                       '2]/div/div/div/ng-component/div/esia-eds-item[1]')
         case 'АТМ':
             wait_click(d,
-                       '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/esia-eds-item[2]')
+                       '/html/body/esia-root/esia-modal-placeholder/div/div['
+                       '2]/div/div/div/ng-component/div/esia-eds-item[2]')
 
     wait_click(d, '/html/body/esia-root/esia-modal-placeholder/div/div[2]/div/div/div/ng-component/div/div[2]/a')
     time.sleep(10)
@@ -304,7 +304,7 @@ def authorization_gu(d, org):
 # Функция авторизации в РА
 def authorization_ra(d, org):
     # Переход на ФСА после входа в EСИА
-    work_source(d)
+    d.get('http://10.250.74.17')
 
     # ожидание
     # Нажатие на кнопку "Вход в ЕСИА"
@@ -343,7 +343,8 @@ def authorization_ra(d, org):
 
             # Выбор рабочей области в нашем случае АЛ
             wait_click(d,
-                       '/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div[1]/fgis-virtual-list-item/li/div')
+                       '/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div['
+                       '1]/fgis-virtual-list-item/li/div')
 
     # Ожидание
     time.sleep(5)
@@ -357,17 +358,21 @@ def authorization_ra(d, org):
 
 # Функция для определения продолжить работу или начать авторизацию
 def all_authorization(d, org):
+
     # переход в рабочую область
-    work_source(d)
+    d.get('http://10.250.74.17/roei/verification-measuring-instruments')
 
     # Ожидание появления строки с необходимым номером
     try:
-        WebDriverWait(d, 10).until(EC.text_to_be_present_in_element((By.XPATH, '/html/body/fgis-root/div/fgis'
-                                                                               '-header/header/div['
-                                                                               '1]/fgis-title/div/div'),
-                                                                    'Сведения по обеспечению единства '
-                                                                    'измерений'))
+        WebDriverWait(d, 10).until(EC.text_to_be_present_in_element((By.XPATH, '/html/body/fgis-root/div/fgis-roei'
+                                                                               '/fgis-roei-verification-measuring'
+                                                                               '-instruments/div/fgis-roei'
+                                                                               '-verification-measuring-instruments'
+                                                                               '-advanced-search/fgis-filters-panel'
+                                                                               '/fgis-left-panel/div[3]/div/a'),
+                                                                    'Очистить фильтры'))
     except Te:
+
         # прохождение авторизации В ГУ
         authorization_gu(d, org)
 
@@ -376,6 +381,16 @@ def all_authorization(d, org):
 
         # прохождение авторизации в RA
         authorization_ra(d, org)
+
+
+# Функция сохранения информации в файле Excel
+def save_wb(wb, file):
+    try:
+        wb.save(file)  # сохраняем статус
+
+    except PermissionError:  # ожидание доступности файла
+        time.sleep(5)
+        save_wb(wb, file)
 
 
 # Функция обработки файла
@@ -402,14 +417,14 @@ def one_rm(file_name, organization):
             # проверка поля статуса Если статус Выгружена в АРШИН тогда переходим к созданию черновика
             if row[6].value == 'Выгружена в АРШИН':
                 row[6].value = update_info(driver, row, organization)  # Заполняем и сохраняем черновик
-                wb.save(file_name)  # сохраняем статус
+                save_wb(wb, file_name)
 
             # Если статус = Черновик РА тогда приступаем к публикации сведения
             if row[6].value == 'Черновик РА':
                 time.sleep(3)
                 row[6].value = public_info(driver, row[0].value)  # публикуем запись\
                 time.sleep(3)
-                wb.save(file_name)  # сохраняем статус
+                save_wb(wb, file_name)  # сохраняем статус
 
             if row[6].value == 'Опубликовано в РА':
                 publ_ra += 1
