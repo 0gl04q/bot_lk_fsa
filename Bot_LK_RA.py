@@ -86,8 +86,11 @@ def browse(org):
     path_to_extension = 'crx/gu.crx'
     options.add_extension(path_to_extension)
 
+    # Включаем логи
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+
     # Отключение метки об автоматическом контроле
-    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-software-rasterizer")
 
     match org:
         case 'МС':
@@ -132,6 +135,8 @@ def work_source(d):
 
 # Функция внесения сведений о поверках
 def update_info(d, r, org):
+    # Сообщение для пользователя
+    print(f'Заполняю сведения под номером {r[0].value} для организации {org}')
 
     # Переход в рабочую область
     work_source(d)
@@ -233,6 +238,7 @@ def update_info(d, r, org):
         case _:
             raise IOError("Неверно указано имя файла")
 
+    # Подтверждение окончания сохранения черновика
     wait_att(d, paste)
 
     return 'Черновик РА'
@@ -253,6 +259,9 @@ def wait_att(d, paste):
 
 # Функция публикации сведения в РА
 def public_info(d, num_res):
+
+    # Сообщение для пользователя
+    print(f'Приступаю к публикации сведения {num_res}')
 
     # Переход в рабочую область
     work_source(d)
@@ -373,14 +382,26 @@ def all_authorization(d, org):
                                                                     'Очистить фильтры'))
     except Te:
 
+        # Сообщение пользователю
+        print(f'Начинаю прохождение авторизации в ГУ для организации {org}')
+
         # прохождение авторизации В ГУ
         authorization_gu(d, org)
+
+        # Сообщение пользователю
+        print(f'Закончил прохождение авторизации в ГУ для организации {org}')
 
         # ожидание
         time.sleep(5)
 
+        # Сообщение пользователю
+        print(f'Начинаю прохождение авторизации в РА для организации {org}')
+
         # прохождение авторизации в RA
         authorization_ra(d, org)
+
+        # Сообщение пользователю
+        print(f'Закончил прохождение авторизации в РА для организации {org}')
 
 
 # Функция сохранения информации в файле Excel
@@ -389,6 +410,11 @@ def save_wb(wb, file):
         wb.save(file)  # сохраняем статус
 
     except PermissionError:  # ожидание доступности файла
+
+        # Сообщение для пользователя
+        print(f'Нет доступа к файлу {file}')
+
+        # Ожидание + перезагрузка
         time.sleep(5)
         save_wb(wb, file)
 
@@ -403,6 +429,9 @@ def one_rm(file_name, organization):
 
     # Проверка на необходимость авторизации
     all_authorization(driver, organization)
+
+    # Сообщение для пользователя
+    print(f'Начинаю перебор файла {file_name}')
 
     # Открытие файла Excel
     wb = load_workbook(filename=file_name)
@@ -419,12 +448,20 @@ def one_rm(file_name, organization):
                 row[6].value = update_info(driver, row, organization)  # Заполняем и сохраняем черновик
                 save_wb(wb, file_name)
 
+                # Сообщение для пользователя
+                print(f'Черновик {row[0].value} сохранен для организации {organization}')
+
             # Если статус = Черновик РА тогда приступаем к публикации сведения
             if row[6].value == 'Черновик РА':
+
                 time.sleep(3)
-                row[6].value = public_info(driver, row[0].value)  # публикуем запись\
+                row[6].value = public_info(driver, row[0].value)  # публикуем запись
+
                 time.sleep(3)
                 save_wb(wb, file_name)  # сохраняем статус
+
+                # Сообщение для пользователя
+                print(f'Сведение {row[0].value} опубликован для организации {organization}')
 
             if row[6].value == 'Опубликовано в РА':
                 publ_ra += 1
@@ -453,14 +490,17 @@ def print_end_publ(p, file):
         name = file.split("/")[1].replace(".xlsx", "").split('.')
         write_file.write(f'{name[0]}.{name[1]} - {p}\n')
 
+        # Сообщение пользователю
+        print(f'Файл {file} завершен. Записал сведения о выгруженных поверках в файл log.txt')
+
 
 # Функция создания потока
 def add_tread(excel):
     # Запуск процесса
-    tr = Thread(name='Browser for {}'.format(excel), target=one_rm, args=(f'file/{excel}', excel.split()[0],))
+    tr = Thread(name='Обработка файла {}'.format(excel), target=one_rm, args=(f'file/{excel}', excel.split()[0],))
     tr.start()
 
-    print(tr.name + ' started!')
+    print(tr.name + ' запущена!')
     return tr
 
 
