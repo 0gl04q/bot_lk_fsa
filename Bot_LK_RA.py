@@ -456,6 +456,7 @@ def save_wb(wb, file):
         save_wb(wb, file)
 
 
+# Функция проверки количества черновиков
 def check_kol(d, my_date, num, prom, file):
     # Переход в рабочую область
     work_source(d)
@@ -500,6 +501,7 @@ def check_kol(d, my_date, num, prom, file):
         time.sleep(100000)
 
 
+# Функция скачивания файла из РА и проверки количества опубликованных счетчиков
 def download_file(d, my_date, obsh, prom, file):
 
     # Сообщение для пользователя
@@ -651,11 +653,19 @@ def one_rm(file_name, organization):
     # Дата поверок
     date = f_name.split(f'.{datetime.datetime.today().year}.')[0].split()[-1]
 
-    # Поиск в памяти файлов организации за эту дату
-    new_obsh = memory(organization, date, obsh)
+    if not f_name.split()[1] == 'СПК':
+        # Получение даты из имени файла
+        my_date = '.'.join(f_name.split()[1].split('.')[0:3])
 
-    # Получение даты из имени файла
-    my_date = '.'.join(f_name.split()[1].split('.')[0:3])
+        # Поиск в памяти файлов организации за эту дату
+        new_obsh = memory(f_name.split()[0], date, obsh)
+
+    else:
+
+        my_date = '.'.join(f_name.split()[2].split('.')[0:3])
+
+        # Поиск в памяти файлов организации за эту дату
+        new_obsh = memory(f_name.split()[1], date, obsh)
 
     # Проверка количества счетчиков
     check_kol(driver, my_date, new_obsh, chern, f_name)
@@ -693,8 +703,19 @@ def one_rm(file_name, organization):
     # Ожидание
     time.sleep(5)
 
-    # Поиск в памяти файлов организации за эту дату
-    new_obsh = memory(organization, date, obsh)
+    if not f_name.split()[1] == 'СПК':
+        # Получение даты из имени файла
+        my_date = '.'.join(f_name.split()[1].split('.')[0:3])
+
+        # Поиск в памяти файлов организации за эту дату
+        new_obsh = memory(f_name.split()[0], date, obsh)
+
+    else:
+
+        my_date = '.'.join(f_name.split()[2].split('.')[0:3])
+
+        # Поиск в памяти файлов организации за эту дату
+        new_obsh = memory(f_name.split()[1], date, obsh)
 
     # Скачивание и перенос файла в необходимую папку
     download_file(driver, my_date, new_obsh, publ_ra, f_name)
@@ -764,12 +785,8 @@ def check_path():
         os.mkdir('end_ra_excel')
 
 
-# Основная функция
-if __name__ == '__main__':
-
-    # проверка пути
-    check_path()
-
+# Функция обработки потоков
+def play_treads():
     # Получение списка файлов в папке
     books = os.listdir(f'{os.getcwd()}/file')
 
@@ -813,3 +830,13 @@ if __name__ == '__main__':
 
             # Ожидание завершения процессов
             close_tread(thread_list)
+
+
+# Основная функция
+if __name__ == '__main__':
+
+    # проверка пути
+    check_path()
+
+    # Запуск программы
+    play_treads()
