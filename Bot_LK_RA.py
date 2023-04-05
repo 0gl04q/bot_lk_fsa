@@ -3,10 +3,11 @@ import time
 import os
 import shutil
 
+import concurrent.futures
+
 from tkinter import messagebox
 
 from openpyxl import load_workbook
-from threading import Thread
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -95,33 +96,36 @@ def browse(org):
     # Отключение метки об автоматическом контроле
     options.add_argument("--disable-software-rasterizer")
 
+    # Добавление пути к профилю Хром
+    options.add_argument(fr"user-data-dir=C:\Users\{str(os.getlogin())}\AppData\Local\Google\Chrome\User Data {org}")
+
+    # Путь к драйверу
+    path = Service('chromedriver.exe')
+
     match org:
         case 'МС':
-            # Добавление пути к профилю Хром
-            options.add_argument(fr"user-data-dir=C:\Users\{str(os.getlogin())}\AppData\Local\Google\Chrome\User Data")
 
             # Указание папки профиля
             options.add_argument("profile-directory=Profile 1")
 
-            # Путь к драйверу
-            path = Service('chromedriver_1.exe')
-
-            # Создание объекта класса Chrome
-            return webdriver.Chrome(service=path, options=options)
-
         case 'АТМ':
-            # Добавление пути к профилю Хром
-            options.add_argument(
-                fr"user-data-dir=C:\Users\{str(os.getlogin())}\AppData\Local\Google\Chrome\User Data Copy")
 
             # Указание папки профиля
             options.add_argument("profile-directory=Profile 2")
 
             # Путь к драйверу
-            path = Service('chromedriver.exe')
+            path = Service('chromedriver_1.exe')
 
-            # Создание объекта класса Chrome
-            return webdriver.Chrome(service=path, options=options)
+        case 'СПК':
+
+            # Указание папки профиля
+            options.add_argument("profile-directory=Profile 3")
+
+            # Путь к драйверу
+            path = Service('chromedriver_2.exe')
+
+    # Создание объекта класса Chrome
+    return webdriver.Chrome(service=path, options=options)
 
 
 # Переход в рабочую область
@@ -238,6 +242,8 @@ def update_info(d, r, org):
             paste = 'Общество с ограниченной ответственностью "МС"'
         case 'АТМ':
             paste = 'Общество с ограниченной ответственностью "АТМ"'
+        case 'СПК':
+            paste = 'Общество с ограниченной ответственностью "СПК"'
         case _:
             raise IOError("Неверно указано имя файла")
 
@@ -343,6 +349,9 @@ def authorization_gu(d, org):
         case 'АТМ':
             wait_click(d,
                        '/html/body/esia-root/esia-modal/div/div[2]/ng-component/div/esia-eds-item[2]/div')
+        case 'СПК':
+            wait_click(d,
+                       '/html/body/esia-root/esia-modal/div/div[2]/ng-component/div/esia-eds-item[3]/div')
 
     wait_click(d, '/html/body/esia-root/esia-modal/div/div[2]/ng-component/div/div[2]/a')
     time.sleep(10)
@@ -380,6 +389,12 @@ def authorization_ra(d, org):
             wait_click(d, "/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div["
                           "1]/fgis-virtual-list-item")
 
+            # Ожидание
+            time.sleep(5)
+
+            # Нажатие на кнопку входа в личный кабинет
+            wait_click(d, "/html/body/fgis-root/div/fgis-lk/div/fgis-lk-selector/div[5]/div/div[2]/button")
+
         case 'АТМ':
             # Выбор организации "АТМ"
             wait_click(d, '/html/body/div/div[2]/div/div/table/tbody/tr[2]/td/a')
@@ -393,11 +408,15 @@ def authorization_ra(d, org):
                        '/html/body/fgis-root/fgis-select-dropdown/div/div/div[2]/fgis-virtual-list/div/div[2]/div['
                        '1]/fgis-virtual-list-item/li/div')
 
-    # Ожидание
-    time.sleep(5)
+            # Ожидание
+            time.sleep(5)
 
-    # Нажатие на кнопку входа в личный кабинет
-    wait_click(d, "/html/body/fgis-root/div/fgis-lk/div/fgis-lk-selector/div[5]/div/div[2]/button")
+            # Нажатие на кнопку входа в личный кабинет
+            wait_click(d, "/html/body/fgis-root/div/fgis-lk/div/fgis-lk-selector/div[5]/div/div[2]/button")
+
+        case 'СПК':
+            # Выбор организации "СПК"
+            wait_click(d, '/html/body/div/div[2]/div/div/table/tbody/tr/td/a')
 
     # Ожидание
     time.sleep(5)
@@ -600,7 +619,7 @@ def wait_clickable(d, path):
 
 
 # Функция обработки файла
-def one_rm(file_name, organization):
+def one_rm(f_name, organization):
     chern = 0
     publ_ra = 0
     obsh = 0
@@ -611,7 +630,7 @@ def one_rm(file_name, organization):
     # Проверка на необходимость авторизации
     all_authorization(driver, organization)
 
-    f_name = file_name.split("/")[1]
+    file_name = f'file/{f_name}'
 
     # Сообщение для пользователя
     print(f'Начинаю перебор файла {f_name}')
@@ -650,25 +669,10 @@ def one_rm(file_name, organization):
     # Сообщение для пользователя
     print(f'Все сведения загружены, приступаю к проверке кол-ва черновиков для организации {organization}')
 
-    # Дата поверок
-    date = f_name.split(f'.{datetime.datetime.today().year}.')[0].split()[-1]
-
-    if not f_name.split()[1] == 'СПК':
-        # Получение даты из имени файла
-        my_date = '.'.join(f_name.split()[1].split('.')[0:3])
-
-        # Поиск в памяти файлов организации за эту дату
-        new_obsh = memory(f_name.split()[0], date, obsh)
-
-    else:
-
-        my_date = '.'.join(f_name.split()[2].split('.')[0:3])
-
-        # Поиск в памяти файлов организации за эту дату
-        new_obsh = memory(f_name.split()[1], date, obsh)
+    my_date = '.'.join(f_name.split()[2].split('.')[0:3])
 
     # Проверка количества счетчиков
-    check_kol(driver, my_date, new_obsh, chern, f_name)
+    check_kol(driver, my_date, obsh, chern, f_name)
 
     # Сообщение для пользователя
     print(f'Проверка прошла успешно, приступаю к публикации черновиков для организации {organization}')
@@ -703,49 +707,16 @@ def one_rm(file_name, organization):
     # Ожидание
     time.sleep(5)
 
-    if not f_name.split()[1] == 'СПК':
-        # Получение даты из имени файла
-        my_date = '.'.join(f_name.split()[1].split('.')[0:3])
-
-        # Поиск в памяти файлов организации за эту дату
-        new_obsh = memory(f_name.split()[0], date, obsh)
-
-    else:
-
-        my_date = '.'.join(f_name.split()[2].split('.')[0:3])
-
-        # Поиск в памяти файлов организации за эту дату
-        new_obsh = memory(f_name.split()[1], date, obsh)
+    my_date = '.'.join(f_name.split()[2].split('.')[0:3])
 
     # Скачивание и перенос файла в необходимую папку
-    download_file(driver, my_date, new_obsh, publ_ra, f_name)
+    download_file(driver, my_date, obsh, publ_ra, f_name)
 
     # Закрытие браузера
     driver.close()
 
     # создание файла итогов
     print_end_publ(publ_ra, file_name)
-
-
-# Проверка счетчиков по памяти
-def memory(org, date, num):
-
-    # Открываем файл
-    with open('end/log.txt', 'r', encoding='utf-8') as file:
-        for row in [row.replace('\n', '') for row in file]:
-            if row:
-                # Разбиваем имя на организацию и кол-во счетчиков
-                sp_name_count = row.split(' - ')
-                sp_name_count = sp_name_count.pop(0).split() + sp_name_count
-
-                # Проверяем условия, если организация АТМ ищем СПК и наоборот
-                if org == 'АТМ' and sp_name_count[0] + ' ' + sp_name_count[1] == 'АТМ СПК' and sp_name_count[2] == date:
-                    return num + int(sp_name_count[3])
-                if org == 'СПК' and sp_name_count[0] == 'АТМ' and sp_name_count[1] == date:
-                    return num + int(sp_name_count[2])
-
-    # Если файл еще не создан или его вовсе не будет просто возвращаем число
-    return num
 
 
 # Добавление итогов по загрузке в файл
@@ -758,23 +729,6 @@ def print_end_publ(p, file):
         print(f'Файл {file.split("/")[1]} завершен. Записал сведения о выгруженных поверках в файл log.txt')
 
 
-# Функция создания потока
-def add_tread(excel):
-    # Запуск процесса
-    tr = Thread(name='Обработка файла {}'.format(excel), target=one_rm, args=(f'file/{excel}', excel.split()[0],))
-    tr.start()
-
-    print(tr.name + ' запущена!')
-    return tr
-
-
-# Функция закрытия потоков
-def close_tread(tr_list):
-    # Ожидание завершения процессов
-    for tr in tr_list:
-        tr.join()
-
-
 # Функция проверки папок и необходимых файлов
 def check_path():
     if not os.path.exists('end'):
@@ -785,51 +739,14 @@ def check_path():
         os.mkdir('end_ra_excel')
 
 
-# Функция обработки потоков
-def play_treads():
-    # Получение списка файлов в папке
-    books = os.listdir(f'{os.getcwd()}/file')
+def thread_function(tup):
+    print(f'Запуск потока {tup[0]}')
 
-    # Создание списков по организациям
-    atm_list = list(filter(lambda x: x.split()[0] == 'АТМ', books))
-    ms_list = list(filter(lambda x: x.split()[0] == 'МС', books))
+    # Перебор файлов организации
+    for book in tup[1]:
+        one_rm(book, tup[0])
 
-    # Формирование списка кортежей
-    sp_tuple = list(zip(atm_list, ms_list))
-
-    thread_list = []
-
-    # Цикл прохода по списку кортежей
-    for b in sp_tuple:
-
-        # Цикл запуска потоков
-        for book_org in b:
-            # Запуск процесса
-            thread_list.append(add_tread(book_org))
-
-            # Ожидание перед запуском последующего браузера
-            time.sleep(10)
-
-        # Ожидание завершения процессов
-        close_tread(thread_list)
-
-    # Поиск оставшихся файлов в папке
-    # Проверяем отличие списка кортежей от суммы списком одной и второй организации
-    if len(sp_tuple) * 2 != len(atm_list) + len(ms_list):
-
-        # Создаем список из кортежей
-        list_book = [b for t_books in sp_tuple for b in t_books]
-
-        # Создаем список
-        itg = filter(lambda x: x not in list_book, books)
-
-        # Перебираем список остатков
-        for book in itg:
-            # Запускаем поток
-            thread_list.append(add_tread(book))
-
-            # Ожидание завершения процессов
-            close_tread(thread_list)
+    print(f'Конец потока {tup[0]}')
 
 
 # Основная функция
@@ -838,5 +755,14 @@ if __name__ == '__main__':
     # проверка пути
     check_path()
 
-    # Запуск программы
-    play_treads()
+    # Получение списка файлов в папке
+    books = os.listdir(f'{os.getcwd()}/file')
+
+    # Создание списков по организациям
+    atm_list = list(filter(lambda x: x.split()[0] == 'АТМ', books))
+    ms_list = list(filter(lambda x: x.split()[0] == 'МС', books))
+    spk_list = list(filter(lambda x: x.split()[0] == 'СПК', books))
+
+    # Запуск потока как отдельного переборщика для каждой организации
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        executor.map(thread_function, [('АТМ', atm_list), ('МС', ms_list), ('СПК', spk_list)])
