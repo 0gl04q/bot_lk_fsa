@@ -669,7 +669,7 @@ def one_rm(f_name, organization):
     # Сообщение для пользователя
     print(f'Все сведения загружены, приступаю к проверке кол-ва черновиков для организации {organization}')
 
-    my_date = '.'.join(f_name.split()[2].split('.')[0:3])
+    my_date = '.'.join(f_name.split()[1].split('.')[0:3])
 
     # Проверка количества счетчиков
     check_kol(driver, my_date, obsh, chern, f_name)
@@ -692,7 +692,7 @@ def one_rm(f_name, organization):
                 save_wb(wb, file_name)  # сохраняем статус
 
                 # Сообщение для пользователя
-                print(f'Сведение {row[0].value} опубликован для организации {organization}')
+                print(f'Сведение под номером {row[0].value} опубликованы для организации {organization}')
 
             # Подсчет опубликованных поверок
             if row[6].value == 'Опубликовано в РА':
@@ -706,8 +706,6 @@ def one_rm(f_name, organization):
 
     # Ожидание
     time.sleep(5)
-
-    my_date = '.'.join(f_name.split()[2].split('.')[0:3])
 
     # Скачивание и перенос файла в необходимую папку
     download_file(driver, my_date, obsh, publ_ra, f_name)
