@@ -243,7 +243,7 @@ def update_info(d, r, org):
         case 'АТМ':
             paste = 'Общество с ограниченной ответственностью "АТМ"'
         case 'СПК':
-            paste = 'Общество с ограниченной ответственностью "СПК"'
+            paste = 'ООО "СПК"'
         case _:
             raise IOError("Неверно указано имя файла")
 
@@ -600,7 +600,7 @@ def download_file(d, my_date, obsh, prom, file):
         time.sleep(5)
 
     # путь итог
-    new_path = f'end_ra_excel/{name_file.replace(".xlsx", f" - {file}")}'
+    new_path = f'//192.168.10.10/ит/ФГИС РА/Сведения о публикации/{name_file.replace(".xlsx", f" - {file}")}'
 
     # Перемещение законченного файла
     shutil.move(path_to_file, new_path)
@@ -702,7 +702,7 @@ def one_rm(f_name, organization):
     wb.close()
 
     # Перемещение законченного файла
-    shutil.move(file_name, f'end/{f_name}')
+    shutil.move(file_name, f'//192.168.10.10/ит/ФГИС РА/Выгружено в РА/{organization}/{f_name}')
 
     # Ожидание
     time.sleep(5)
@@ -719,7 +719,7 @@ def one_rm(f_name, organization):
 
 # Добавление итогов по загрузке в файл
 def print_end_publ(p, file):
-    with open('end/log.txt', 'a', encoding='utf-8') as write_file:
+    with open('//192.168.10.10/ит/ФГИС РА/log.txt', 'a', encoding='utf-8') as write_file:
         name = file.split("/")[1].replace(".xlsx", "").split('.')
         write_file.write(f'{name[0]}.{name[1]} - {p}\n')
 
@@ -727,40 +727,21 @@ def print_end_publ(p, file):
         print(f'Файл {file.split("/")[1]} завершен. Записал сведения о выгруженных поверках в файл log.txt')
 
 
-# Функция проверки папок и необходимых файлов
-def check_path():
-    if not os.path.exists('end'):
-        os.mkdir('end')
-    if not os.path.exists('file'):
-        os.mkdir('file')
-    if not os.path.exists('end_ra_excel'):
-        os.mkdir('end_ra_excel')
+def thread_function(org):
+    print(f'Запуск потока {org}')
 
-
-def thread_function(tup):
-    print(f'Запуск потока {tup[0]}')
+    books = os.listdir(f'//192.168.10.10/ит/ФГИС РА/Подготовлено к выгрузке/{org}')
 
     # Перебор файлов организации
-    for book in tup[1]:
-        one_rm(book, tup[0])
+    for book in books:
+        one_rm(book, org)
 
-    print(f'Конец потока {tup[0]}')
+    print(f'Конец потока {org}')
 
 
 # Основная функция
 if __name__ == '__main__':
 
-    # проверка пути
-    check_path()
-
-    # Получение списка файлов в папке
-    books = os.listdir(f'{os.getcwd()}/file')
-
-    # Создание списков по организациям
-    atm_list = list(filter(lambda x: x.split()[0] == 'АТМ', books))
-    ms_list = list(filter(lambda x: x.split()[0] == 'МС', books))
-    spk_list = list(filter(lambda x: x.split()[0] == 'СПК', books))
-
     # Запуск потока как отдельного переборщика для каждой организации
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        executor.map(thread_function, [('АТМ', atm_list), ('МС', ms_list), ('СПК', spk_list)])
+        executor.map(thread_function, ['АТМ', 'МС', 'СПК'])
