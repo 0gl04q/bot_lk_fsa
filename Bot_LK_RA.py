@@ -2,7 +2,7 @@ import datetime
 import time
 import os
 import shutil
-
+import threading
 import concurrent.futures
 
 from tkinter import messagebox
@@ -269,11 +269,11 @@ def wait_att(d, paste):
 # Ожидание появления необходимой даты в таблице
 def wait_date(d, paste, obsh):
     try:
+        # Принудительное ожидание
+        time.sleep(10)
+
         match obsh:
             case 1:
-
-                # Принудительное ожидание
-                time.sleep(10)
 
                 # Проверка даты в 1 строке таблицы
                 WebDriverWait(d, 60).until(
@@ -476,7 +476,7 @@ def save_wb(wb, file):
 
 
 # Функция проверки количества черновиков
-def check_kol(d, my_date, num, prom, file):
+def check_kol(d, my_date, num, prom, file, ff, org):
     # Переход в рабочую область
     work_source(d)
 
@@ -509,6 +509,40 @@ def check_kol(d, my_date, num, prom, file):
 
     # Проверка на совпадение
     if not count_poverka_ra == str(num):
+
+        for row in ff:
+            num = row[0].value
+
+            wait_send_keys(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
+                              '/fgis-roei-ver'
+                              'ification-measuring-instruments-advanced-search/fgis-filters-panel/fgis-left-panel'
+                              '/div[2]/div[2]/d'
+                              'iv/div[1]/fgis-field-input/fgis-field-wrapper/div/div/input', num)
+
+            wait_click(d, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div/fgis'
+                          '-roei-verification-measuring-instruments-advanced-search/fgis-filters-panel/fgis-left'
+                          '-panel/div[3]/div/button')
+
+            try:
+                # Проверка номера в 1 строке таблицы
+                WebDriverWait(d, 10).until(
+                    EC.text_to_be_present_in_element(
+                        (By.XPATH, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
+                                   '/div/div[2]/fgis-table/div[2]/div/table/tbody/a/td[5]/div/div[1]/span'), num))
+            except Te:
+                print(f'Пропущен номер {num}')
+
+                update_info(d, row, org)
+
+                if check_kol(d, my_date, num, prom, file, ff, org):
+                    return
+
+            d.find_element(By.XPATH, '/html/body/fgis-root/div/fgis-roei/fgis-roei-verification-measuring-instruments/div'
+                                     '/fgis-roei-ver'
+                                     'ification-measuring-instruments-advanced-search/fgis-filters-panel/fgis-left-panel'
+                                     '/div[2]/div[2]/d'
+                                     'iv/div[1]/fgis-field-input/fgis-field-wrapper/div/div/input').clear()
+
         messagebox.showwarning(f"Остановка программы {file}",
                                f'Не сходятся значения кол-ва счетчиков\n'
                                f'Количество в РА - {count_poverka_ra}\n'
@@ -519,10 +553,11 @@ def check_kol(d, my_date, num, prom, file):
 
         time.sleep(100000)
 
+    return True
+
 
 # Функция скачивания файла из РА и проверки количества опубликованных счетчиков
 def download_file(d, my_date, obsh, prom, file):
-
     # Сообщение для пользователя
     print(f'Начинаю проверку публикации файла {file}')
 
@@ -630,7 +665,7 @@ def one_rm(f_name, organization):
     # Проверка на необходимость авторизации
     all_authorization(driver, organization)
 
-    file_name = f'file/{f_name}'
+    file_name = f'//192.168.10.10/ит/ФГИС РА/Подготовлено к выгрузке/{organization}/{f_name}'
 
     # Сообщение для пользователя
     print(f'Начинаю перебор файла {f_name}')
@@ -672,7 +707,8 @@ def one_rm(f_name, organization):
     my_date = '.'.join(f_name.split()[1].split('.')[0:3])
 
     # Проверка количества счетчиков
-    check_kol(driver, my_date, obsh, chern, f_name)
+    check_kol(driver, my_date, obsh, chern, f_name,
+              [row for row in sheet.iter_rows(min_row=2) if row[1].value], organization)
 
     # Сообщение для пользователя
     print(f'Проверка прошла успешно, приступаю к публикации черновиков для организации {organization}')
@@ -714,17 +750,17 @@ def one_rm(f_name, organization):
     driver.close()
 
     # создание файла итогов
-    print_end_publ(publ_ra, file_name)
+    print_end_publ(publ_ra, f_name)
 
 
 # Добавление итогов по загрузке в файл
 def print_end_publ(p, file):
     with open('//192.168.10.10/ит/ФГИС РА/log.txt', 'a', encoding='utf-8') as write_file:
-        name = file.split("/")[1].replace(".xlsx", "").split('.')
-        write_file.write(f'{name[0]}.{name[1]} - {p}\n')
+        name = file.replace(".xlsx", "").split('.')
+        write_file.write(f'{name} - {p}\n')
 
         # Сообщение пользователю
-        print(f'Файл {file.split("/")[1]} завершен. Записал сведения о выгруженных поверках в файл log.txt')
+        print(f'Файл {file} завершен. Записал сведения о выгруженных поверках в файл log.txt')
 
 
 def thread_function(org):
@@ -741,7 +777,17 @@ def thread_function(org):
 
 # Основная функция
 if __name__ == '__main__':
+    '''
+    Потоки для отладки работоспособности бота
+    '''
+    threads = list()
+    for o in ['АТМ', 'МС', 'СПК']:
+        x = threading.Thread(target=thread_function, args=(o,))
+        threads.append(x)
+        x.start()
+    for index, thread in enumerate(threads):
+        thread.join()
 
-    # Запуск потока как отдельного переборщика для каждой организации
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        executor.map(thread_function, ['АТМ', 'МС', 'СПК'])
+    # # Запуск потока как отдельного переборщика для каждой организации
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    #     executor.map(thread_function, ['АТМ', 'МС', 'СПК'])
